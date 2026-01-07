@@ -293,13 +293,13 @@ class GameProvider extends ChangeNotifier {
     }
 
     final moveColor = _chess.turn;
-    final moveResult = _chess.move({
+    final moveSuccess = _chess.move({
       'from': from,
       'to': to,
       'promotion': promotion,
     });
 
-    if (moveResult == null) {
+    if (moveSuccess == false) {
       _soundService.play(SoundType.illegal);
       _clearSelection();
       return;
@@ -430,13 +430,13 @@ class GameProvider extends ChangeNotifier {
     final flags = moveInfo['flags'] as String? ?? '';
 
     final moveColor = _chess.turn;
-    final moveResult = _chess.move({
+    final moveSuccess = _chess.move({
       'from': from,
       'to': to,
       'promotion': promotion,
     });
 
-    if (moveResult == null) return;
+    if (moveSuccess == false) return;
 
     // Record the move
     final chessMove = ChessMove(
@@ -471,6 +471,7 @@ class GameProvider extends ChangeNotifier {
     _playMoveSoundFromInfo(san, captured, flags);
     _checkGameEnd();
     _saveGame();
+    notifyListeners();
   }
 
   String _getPieceSymbol(chess_lib.PieceType type, chess_lib.Color color) {

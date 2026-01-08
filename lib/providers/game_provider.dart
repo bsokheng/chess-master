@@ -167,9 +167,15 @@ class GameProvider extends ChangeNotifier {
   /// Handle square tap
   void onSquareTap(String square) {
     if (_gameResult != GameResult.ongoing) return;
+    if (_pendingPromotion != null) return;
+
+    // Safety: if it's player's turn but AI thinking is stuck, reset it
+    if (_isPlayerTurnNow() && _isAIThinking) {
+      _isAIThinking = false;
+    }
+
     if (_isAIThinking) return;
     if (!_isPlayerTurnNow()) return;
-    if (_pendingPromotion != null) return;
 
     final piece = _chess.get(square);
 
@@ -205,8 +211,14 @@ class GameProvider extends ChangeNotifier {
 
   bool _isOwnPiece(chess_lib.Piece piece) {
     final isWhitePiece = piece.color == chess_lib.Color.WHITE;
+    final playerIsWhite = _playerColor == PlayerColor.white;
     final isWhiteTurn = _chess.turn == chess_lib.Color.WHITE;
-    return isWhitePiece == isWhiteTurn;
+
+    // Must be player's piece AND player's turn
+    final isPlayersPiece = isWhitePiece == playerIsWhite;
+    final isPlayersTurn = isWhiteTurn == playerIsWhite;
+
+    return isPlayersPiece && isPlayersTurn;
   }
 
   void _selectSquare(String square) {
@@ -278,36 +290,37 @@ class GameProvider extends ChangeNotifier {
 
   /// Execute a move
   void _executeMove(String from, String to, String? promotion) {
-    // Get verbose move info before making the move
-    final moves = _chess.moves({'verbose': true});
-    final moveInfo = moves.cast<Map<String, dynamic>>().firstWhere(
-      (m) => m['from'] == from && m['to'] == to &&
-             (promotion == null || m['promotion'] == promotion),
-      orElse: () => <String, dynamic>{},
-    );
-
-    if (moveInfo.isEmpty) {
-      _soundService.play(SoundType.illegal);
-      _clearSelection();
-      return;
+    // Get move info before executing
+    Map<String, dynamic>? moveInfo;
+    final verboseMoves = _chess.moves({'verbose': true});
+    for (final m in verboseMoves) {
+      final move = m as Map;
+      if (move['from'] == from && move['to'] == to) {
+        if (promotion == null || move['promotion'] == promotion) {
+          moveInfo = Map<String, dynamic>.from(move);
+          break;
+        }
+      }
     }
 
     final moveColor = _chess.turn;
+
+    // Try to make the move
     final moveSuccess = _chess.move({
       'from': from,
       'to': to,
-      'promotion': promotion,
+      if (promotion != null) 'promotion': promotion,
     });
 
-    if (moveSuccess == false) {
+    if (moveSuccess == null || moveSuccess == false) {
       _soundService.play(SoundType.illegal);
       _clearSelection();
       return;
     }
 
-    final san = moveInfo['san'] as String? ?? '';
-    final captured = moveInfo['captured'] as String?;
-    final flags = moveInfo['flags'] as String? ?? '';
+    final san = moveInfo?['san'] as String? ?? '$from$to';
+    final captured = moveInfo?['captured'] as String?;
+    final flags = moveInfo?['flags'] as String? ?? '';
 
     // Record the move
     final chessMove = ChessMove(
@@ -356,7 +369,12 @@ class GameProvider extends ChangeNotifier {
 
     // Make AI move if game is still ongoing
     if (_gameResult == GameResult.ongoing && !_isPlayerTurnNow()) {
-      _makeAIMove();
+      // Use delayed to ensure UI updates first
+      Future.delayed(const Duration(milliseconds: 100), () {
+        if (_gameResult == GameResult.ongoing) {
+          _makeAIMove();
+        }
+      });
     }
   }
 
@@ -395,29 +413,86 @@ class GameProvider extends ChangeNotifier {
   /// Make AI move
   Future<void> _makeAIMove() async {
     if (_gameResult != GameResult.ongoing) return;
+    if (_isPlayerTurnNow()) return; // Safety check
 
     _isAIThinking = true;
     notifyListeners();
 
-    // Small delay so UI updates
-    await Future.delayed(const Duration(milliseconds: 100));
+    // Delay so UI shows "thinking"
+    await Future.delayed(const Duration(milliseconds: 400));
 
-    try {
-      final aiMoveInfo = await _aiService.findBestMoveInfo(_chess, _difficulty);
+    // Get all legal moves
+    final moves = _chess.moves();
+    if (moves.isEmpty) {
+      _isAIThinking = false;
+      notifyListeners();
+      return;
+    }
 
-      if (aiMoveInfo != null && _gameResult == GameResult.ongoing) {
-        _executeAIMoveFromInfo(aiMoveInfo);
-      }
-    } catch (e) {
-      // Fallback: make a random legal move
-      final moves = _chess.moves({'verbose': true});
-      if (moves.isNotEmpty) {
-        final randomMove = moves[0] as Map<String, dynamic>;
-        _executeAIMoveFromInfo(randomMove);
+    // Pick a random move
+    final randomIndex = DateTime.now().millisecondsSinceEpoch % moves.length;
+    final selectedSan = moves[randomIndex] as String;
+
+    // Execute the move
+    _executeAIMoveSan(selectedSan);
+
+    _isAIThinking = false;
+    notifyListeners();
+  }
+
+  void _executeAIMoveSan(String san) {
+    // Get move details before executing
+    final verboseMoves = _chess.moves({'verbose': true});
+    Map<String, dynamic>? moveInfo;
+    for (final m in verboseMoves) {
+      if ((m as Map)['san'] == san) {
+        moveInfo = Map<String, dynamic>.from(m);
+        break;
       }
     }
 
-    _isAIThinking = false;
+    final moveColor = _chess.turn;
+    final success = _chess.move(san);
+
+    if (success == null || success == false) return;
+
+    final from = moveInfo?['from'] as String? ?? '';
+    final to = moveInfo?['to'] as String? ?? '';
+    final captured = moveInfo?['captured'] as String?;
+
+    // Record the move
+    final chessMove = ChessMove(
+      from: from,
+      to: to,
+      promotion: moveInfo?['promotion'] as String?,
+      algebraicNotation: san,
+      capturedPiece: captured,
+      isCheck: _chess.in_check,
+      isCheckmate: _chess.in_checkmate,
+      isCastling: san.contains('O-O'),
+      isEnPassant: false,
+    );
+    _moveHistory.add(chessMove);
+
+    // Update captured pieces
+    if (captured != null) {
+      final pieceType = _getPieceTypeFromChar(captured);
+      if (pieceType != null) {
+        final capturedPiece = _getPieceSymbol(pieceType, moveColor == chess_lib.Color.WHITE ? chess_lib.Color.BLACK : chess_lib.Color.WHITE);
+        if (moveColor == chess_lib.Color.WHITE) {
+          _blackCaptured.add(capturedPiece);
+        } else {
+          _whiteCaptured.add(capturedPiece);
+        }
+      }
+    }
+
+    _lastMoveFrom = from;
+    _lastMoveTo = to;
+
+    _playMoveSoundFromInfo(san, captured, '');
+    _checkGameEnd();
+    _saveGame();
     notifyListeners();
   }
 
@@ -430,13 +505,24 @@ class GameProvider extends ChangeNotifier {
     final flags = moveInfo['flags'] as String? ?? '';
 
     final moveColor = _chess.turn;
-    final moveSuccess = _chess.move({
-      'from': from,
-      'to': to,
-      'promotion': promotion,
-    });
 
-    if (moveSuccess == false) return;
+    // Try using SAN notation first (more reliable)
+    bool moveSuccess = false;
+    if (san.isNotEmpty) {
+      moveSuccess = _chess.move(san) != null;
+    }
+
+    // Fallback to from/to format
+    if (!moveSuccess) {
+      final result = _chess.move({
+        'from': from,
+        'to': to,
+        if (promotion != null) 'promotion': promotion,
+      });
+      moveSuccess = result != null && result != false;
+    }
+
+    if (!moveSuccess) return;
 
     // Record the move
     final chessMove = ChessMove(

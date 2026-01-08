@@ -123,14 +123,17 @@ class ChessAIService {
     final moves = chess.moves({'verbose': true});
     if (moves.isEmpty) return null;
 
-    final movesList = moves.cast<Map<String, dynamic>>();
+    // Create a proper list copy to avoid cast issues
+    final movesList = List<Map<String, dynamic>>.from(
+      moves.map((m) => Map<String, dynamic>.from(m as Map)),
+    );
 
     // Add some randomness at lower difficulties
     if (difficulty == AIDifficulty.easy && _random.nextDouble() < 0.3) {
       return movesList[_random.nextInt(movesList.length)];
     }
 
-    Map<String, dynamic>? bestMove;
+    Map<String, dynamic>? bestMove = movesList.first;
     int bestValue = -100000;
     final int depth = difficulty.depth;
 
@@ -141,7 +144,8 @@ class ChessAIService {
     _orderMoves(chess, movesList);
 
     for (final move in movesList) {
-      chess.move(move);
+      final moveSuccess = chess.move(move);
+      if (moveSuccess == false) continue;
 
       // Minimax with alpha-beta pruning
       final value = -_minimax(

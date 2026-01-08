@@ -104,8 +104,15 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
           ),
         ),
 
-        // Captured pieces (opponent's captures)
-        CapturedPiecesWidget(showWhiteCaptured: !game.isBoardFlipped),
+        // Captured pieces (opponent's captures) with material advantage
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Expanded(child: CapturedPiecesWidget(showWhiteCaptured: !game.isBoardFlipped)),
+            const MaterialAdvantageWidget(),
+            const SizedBox(width: 16),
+          ],
+        ),
 
         // Chess board
         Padding(

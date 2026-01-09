@@ -464,6 +464,8 @@ class _DifficultyOption extends StatelessWidget {
         return Icons.person;
       case AIDifficulty.hard:
         return Icons.psychology;
+      case AIDifficulty.expert:
+        return Icons.emoji_events;
     }
   }
 }

@@ -128,8 +128,20 @@ class ChessAIService {
       moves.map((m) => Map<String, dynamic>.from(m as Map)),
     );
 
-    // Add some randomness at lower difficulties
-    if (difficulty == AIDifficulty.easy && _random.nextDouble() < 0.3) {
+    // Add randomness based on difficulty to make easier levels more forgiving
+    final randomChance = switch (difficulty) {
+      AIDifficulty.easy => 0.4,    // 40% chance of random move
+      AIDifficulty.medium => 0.15, // 15% chance of random move
+      AIDifficulty.hard => 0.0,    // No random moves
+      AIDifficulty.expert => 0.0,  // No random moves
+    };
+
+    if (_random.nextDouble() < randomChance) {
+      // For easy mode, sometimes make a "reasonable" random move (prefer captures)
+      final captures = movesList.where((m) => m['captured'] != null).toList();
+      if (captures.isNotEmpty && _random.nextDouble() < 0.5) {
+        return captures[_random.nextInt(captures.length)];
+      }
       return movesList[_random.nextInt(movesList.length)];
     }
 
@@ -298,17 +310,25 @@ class ChessAIService {
     });
   }
 
-  /// Get numeric piece value from piece character
-  int _getPieceValue(String? piece) {
-    switch (piece?.toLowerCase()) {
-      case 'p': return 100;
-      case 'n': return 320;
-      case 'b': return 330;
-      case 'r': return 500;
-      case 'q': return 900;
-      case 'k': return 20000;
-      default: return 0;
+  /// Get numeric piece value from piece (handles both String and PieceType)
+  int _getPieceValue(dynamic piece) {
+    if (piece == null) return 0;
+
+    // Handle PieceType enum directly
+    if (piece is chess_lib.PieceType) {
+      return _pieceValues[piece] ?? 0;
     }
+
+    // Handle String representation
+    final str = piece.toString().toLowerCase();
+    if (str.contains('pawn') || str == 'p') return 100;
+    if (str.contains('knight') || str == 'n') return 320;
+    if (str.contains('bishop') || str == 'b') return 330;
+    if (str.contains('rook') || str == 'r') return 500;
+    if (str.contains('queen') || str == 'q') return 900;
+    if (str.contains('king') || str == 'k') return 20000;
+
+    return 0;
   }
 
   /// Evaluate the current position

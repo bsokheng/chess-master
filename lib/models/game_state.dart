@@ -59,10 +59,16 @@ enum GameResult {
 }
 
 /// AI difficulty levels
+/// Depth determines how many moves ahead the AI thinks:
+/// - Easy: 2 moves ahead (beginner friendly, makes some random moves)
+/// - Medium: 4 moves ahead (moderate challenge)
+/// - Hard: 6 moves ahead (strong play, good tactical awareness)
+/// - Expert: 8 moves ahead (very strong, difficult to beat)
 enum AIDifficulty {
   easy(2, 'Easy'),
   medium(4, 'Medium'),
-  hard(6, 'Hard');
+  hard(6, 'Hard'),
+  expert(8, 'Expert');
 
   final int depth;
   final String displayName;

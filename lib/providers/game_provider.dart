@@ -319,7 +319,8 @@ class GameProvider extends ChangeNotifier {
     }
 
     final san = moveInfo?['san'] as String? ?? '$from$to';
-    final captured = moveInfo?['captured'] as String?;
+    // captured can be PieceType or String depending on chess library version
+    final captured = _getCapturedPieceChar(moveInfo?['captured']);
     final flags = moveInfo?['flags'] as String? ?? '';
 
     // Record the move
@@ -378,6 +379,39 @@ class GameProvider extends ChangeNotifier {
     }
   }
 
+  /// Convert captured piece info to single character (handles both PieceType and String)
+  String? _getCapturedPieceChar(dynamic captured) {
+    if (captured == null) return null;
+
+    // If it's already a string like "p", "n", etc.
+    if (captured is String) {
+      return captured.isNotEmpty ? captured[0].toLowerCase() : null;
+    }
+
+    // If it's a PieceType enum
+    if (captured is chess_lib.PieceType) {
+      switch (captured) {
+        case chess_lib.PieceType.PAWN: return 'p';
+        case chess_lib.PieceType.KNIGHT: return 'n';
+        case chess_lib.PieceType.BISHOP: return 'b';
+        case chess_lib.PieceType.ROOK: return 'r';
+        case chess_lib.PieceType.QUEEN: return 'q';
+        case chess_lib.PieceType.KING: return 'k';
+      }
+    }
+
+    // Fallback: try to extract from toString()
+    final str = captured.toString().toLowerCase();
+    if (str.contains('pawn')) return 'p';
+    if (str.contains('knight')) return 'n';
+    if (str.contains('bishop')) return 'b';
+    if (str.contains('rook')) return 'r';
+    if (str.contains('queen')) return 'q';
+    if (str.contains('king')) return 'k';
+
+    return null;
+  }
+
   chess_lib.PieceType? _getPieceTypeFromChar(String char) {
     switch (char.toLowerCase()) {
       case 'p': return chess_lib.PieceType.PAWN;
@@ -410,7 +444,7 @@ class GameProvider extends ChangeNotifier {
     }
   }
 
-  /// Make AI move
+  /// Make AI move using the minimax algorithm
   Future<void> _makeAIMove() async {
     if (_gameResult != GameResult.ongoing) return;
     if (_isPlayerTurnNow()) return; // Safety check
@@ -418,26 +452,34 @@ class GameProvider extends ChangeNotifier {
     _isAIThinking = true;
     notifyListeners();
 
-    // Delay so UI shows "thinking"
-    await Future.delayed(const Duration(milliseconds: 400));
+    try {
+      // Small delay so UI shows "thinking"
+      await Future.delayed(const Duration(milliseconds: 100));
 
-    // Get all legal moves
-    final moves = _chess.moves();
-    if (moves.isEmpty) {
+      // Use the AI service to find the best move based on difficulty
+      final bestMoveInfo = await _aiService.findBestMoveInfo(_chess, _difficulty);
+
+      if (bestMoveInfo == null) {
+        // No valid moves - game might be over
+        return;
+      }
+
+      // Execute the AI's chosen move
+      _executeAIMoveFromInfo(bestMoveInfo);
+    } catch (e) {
+      print('AI move error: $e');
+      // Fallback to random move if AI fails
+      final moves = _chess.moves();
+      if (moves.isNotEmpty) {
+        final randomIndex = DateTime.now().millisecondsSinceEpoch % moves.length;
+        final selectedSan = moves[randomIndex] as String;
+        _executeAIMoveSan(selectedSan);
+      }
+    } finally {
+      // Always reset AI thinking state
       _isAIThinking = false;
       notifyListeners();
-      return;
     }
-
-    // Pick a random move
-    final randomIndex = DateTime.now().millisecondsSinceEpoch % moves.length;
-    final selectedSan = moves[randomIndex] as String;
-
-    // Execute the move
-    _executeAIMoveSan(selectedSan);
-
-    _isAIThinking = false;
-    notifyListeners();
   }
 
   void _executeAIMoveSan(String san) {
@@ -458,7 +500,8 @@ class GameProvider extends ChangeNotifier {
 
     final from = moveInfo?['from'] as String? ?? '';
     final to = moveInfo?['to'] as String? ?? '';
-    final captured = moveInfo?['captured'] as String?;
+    // captured can be PieceType or String depending on chess library version
+    final captured = _getCapturedPieceChar(moveInfo?['captured']);
 
     // Record the move
     final chessMove = ChessMove(
@@ -501,7 +544,8 @@ class GameProvider extends ChangeNotifier {
     final to = moveInfo['to'] as String;
     final promotion = moveInfo['promotion'] as String?;
     final san = moveInfo['san'] as String? ?? '';
-    final captured = moveInfo['captured'] as String?;
+    // captured can be PieceType or String depending on chess library version
+    final captured = _getCapturedPieceChar(moveInfo['captured']);
     final flags = moveInfo['flags'] as String? ?? '';
 
     final moveColor = _chess.turn;

@@ -123,27 +123,42 @@ class ChessAIService {
     final moves = chess.moves({'verbose': true});
     if (moves.isEmpty) return null;
 
+    // Create a copy of the chess object for search to avoid modifying the original
+    final searchChess = chess_lib.Chess.fromFEN(chess.fen);
+
     // Create a proper list copy to avoid cast issues
     final movesList = List<Map<String, dynamic>>.from(
       moves.map((m) => Map<String, dynamic>.from(m as Map)),
     );
 
-    // Add randomness based on difficulty to make easier levels more forgiving
-    final randomChance = switch (difficulty) {
-      AIDifficulty.easy => 0.4,    // 40% chance of random move
-      AIDifficulty.medium => 0.15, // 15% chance of random move
-      AIDifficulty.hard => 0.0,    // No random moves
-      AIDifficulty.expert => 0.0,  // No random moves
-    };
-
-    if (_random.nextDouble() < randomChance) {
-      // For easy mode, sometimes make a "reasonable" random move (prefer captures)
-      final captures = movesList.where((m) => m['captured'] != null).toList();
-      if (captures.isNotEmpty && _random.nextDouble() < 0.5) {
-        return captures[_random.nextInt(captures.length)];
+    // Easy mode: mostly random moves (beatable by beginners)
+    if (difficulty == AIDifficulty.easy) {
+      // 80% chance of random move for Easy - very beatable
+      if (_random.nextDouble() < 0.8) {
+        return movesList[_random.nextInt(movesList.length)];
       }
-      return movesList[_random.nextInt(movesList.length)];
     }
+
+    // Medium mode: 50% random moves
+    if (difficulty == AIDifficulty.medium) {
+      if (_random.nextDouble() < 0.5) {
+        // Prefer captures when making random moves (slightly smarter)
+        final captures = movesList.where((m) => m['captured'] != null).toList();
+        if (captures.isNotEmpty && _random.nextDouble() < 0.6) {
+          return captures[_random.nextInt(captures.length)];
+        }
+        return movesList[_random.nextInt(movesList.length)];
+      }
+    }
+
+    // Hard mode: 20% random moves
+    if (difficulty == AIDifficulty.hard) {
+      if (_random.nextDouble() < 0.2) {
+        return movesList[_random.nextInt(movesList.length)];
+      }
+    }
+
+    // Expert mode: no random moves, pure minimax
 
     Map<String, dynamic>? bestMove = movesList.first;
     int bestValue = -100000;
@@ -153,22 +168,22 @@ class ChessAIService {
     movesList.shuffle(_random);
 
     // Sort moves for better alpha-beta pruning (captures first)
-    _orderMoves(chess, movesList);
+    _orderMoves(searchChess, movesList);
 
     for (final move in movesList) {
-      final moveSuccess = chess.move(move);
+      final moveSuccess = searchChess.move(move);
       if (moveSuccess == false) continue;
 
       // Minimax with alpha-beta pruning
       final value = -_minimax(
-        chess,
+        searchChess,
         depth - 1,
         -100000,
         100000,
         false,
       );
 
-      chess.undo();
+      searchChess.undo();
 
       if (value > bestValue) {
         bestValue = value;
@@ -196,9 +211,9 @@ class ChessAIService {
     int beta,
     bool isMaximizing,
   ) {
-    // Terminal conditions
+    // Terminal conditions - just evaluate, no quiescence search for speed
     if (depth == 0) {
-      return _quiescenceSearch(chess, alpha, beta, 4);
+      return _evaluatePosition(chess);
     }
 
     if (chess.in_checkmate) {

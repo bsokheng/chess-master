@@ -22,7 +22,22 @@
       "Bash(~/Library/Android/sdk/platform-tools/adb kill-server)",
       "Bash(~/Library/Android/sdk/platform-tools/adb start-server)",
       "Bash(qrencode:*)",
-      "Bash(open:*)"
+      "Bash(open:*)",
+      "Bash(~/Library/Android/sdk/emulator/emulator:*)",
+      "Bash(pkill:*)",
+      "Bash(export PATH=\"$ANDROID_HOME/platform-tools:$PATH\")",
+      "Bash(adb start-server:*)",
+      "Bash(adb devices:*)",
+      "Bash(~/Library/Android/sdk/platform-tools/adb logcat -d)",
+      "Bash(~/Library/Android/sdk/platform-tools/adb logcat -c)",
+      "Bash(~/Library/Android/sdk/platform-tools/adb -s emulator-5554 logcat -d)",
+      "Bash(nc:*)",
+      "Bash(~/Library/Android/sdk/platform-tools/adb -s emulator-5554 logcat -c)",
+      "Bash(# Try using text to find and tap ~/Library/Android/sdk/platform-tools/adb -s emulator-5554 shell \"\"uiautomator dump /dev/tty\"\")",
+      "Bash(gh auth:*)",
+      "Bash(~/Library/Android/sdk/platform-tools/adb -s emulator-5554 exec-out screencap -p)",
+      "Bash(# Kill existing flutter processes and clear app data pkill -f \"\"flutter\"\" ~/Library/Android/sdk/platform-tools/adb -s emulator-5554 shell pm clear com.example.chess_master sleep 2 # Run flutter with output visible /opt/homebrew/bin/flutter run -d emulator-5554 2>&1)",
+      "Bash(# Take screenshot and check more detailed logs ~/Library/Android/sdk/platform-tools/adb -s emulator-5554 exec-out screencap -p ~/Library/Android/sdk/platform-tools/adb -s emulator-5554 logcat -d)"
     ]
   }
 }

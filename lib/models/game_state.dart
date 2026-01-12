@@ -59,16 +59,13 @@ enum GameResult {
 }
 
 /// AI difficulty levels
-/// Depth determines how many moves ahead the AI thinks:
-/// - Easy: 2 moves ahead (beginner friendly, makes some random moves)
-/// - Medium: 4 moves ahead (moderate challenge)
-/// - Hard: 6 moves ahead (strong play, good tactical awareness)
-/// - Expert: 8 moves ahead (very strong, difficult to beat)
+/// Depth determines how many moves ahead the AI thinks
+/// Note: Depths kept very low to prevent UI freezing on mobile devices
 enum AIDifficulty {
-  easy(2, 'Easy'),
-  medium(4, 'Medium'),
-  hard(6, 'Hard'),
-  expert(8, 'Expert');
+  easy(1, 'Easy'),       // Random-ish moves, very beatable
+  medium(2, 'Medium'),   // Basic tactics
+  hard(2, 'Hard'),       // Same depth but no random moves
+  expert(3, 'Expert');   // Strongest, still smooth on mobile
 
   final int depth;
   final String displayName;

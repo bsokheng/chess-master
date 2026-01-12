@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:google_fonts/google_fonts.dart';
-
 import 'providers/game_provider.dart';
 import 'providers/settings_provider.dart';
 import 'providers/statistics_provider.dart';
@@ -81,7 +79,7 @@ class ChessMasterApp extends StatelessWidget {
         seedColor: const Color(0xFF5D4037),
         brightness: Brightness.light,
       ),
-      textTheme: GoogleFonts.poppinsTextTheme(),
+      // Using default system font instead of Google Fonts for offline compatibility
       appBarTheme: const AppBarTheme(
         centerTitle: true,
         elevation: 0,
@@ -111,7 +109,7 @@ class ChessMasterApp extends StatelessWidget {
         seedColor: const Color(0xFF8D6E63),
         brightness: Brightness.dark,
       ),
-      textTheme: GoogleFonts.poppinsTextTheme(ThemeData.dark().textTheme),
+      // Using default system font instead of Google Fonts for offline compatibility
       appBarTheme: const AppBarTheme(
         centerTitle: true,
         elevation: 0,
